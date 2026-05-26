@@ -13,11 +13,19 @@ function getBackendBaseUrl(): string {
   if (typeof window === 'undefined') return 'http://127.0.0.1:3001';
   const { hostname, protocol } = window.location;
   // 本地开发
-  if (hostname === 'localhost' || hostname === '127.0.0.1') return 'http://127.0.0.1:3001';
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('[上传] getBackendBaseUrl → 本地开发，使用 http://127.0.0.1:3001');
+    return 'http://127.0.0.1:3001';
+  }
   // HTTPS 页面（GitHub Pages 等）→ 走 Cloudflare Tunnel，避免 Mixed Content
-  if (protocol === 'https:') return CLOUDFLARED_TUNNEL_BASE;
+  if (protocol === 'https:') {
+    console.log(`[上传] getBackendBaseUrl → HTTPS 页面，使用 Cloudflare Tunnel: ${CLOUDFLARED_TUNNEL_BASE}`);
+    return CLOUDFLARED_TUNNEL_BASE;
+  }
   // HTTP 局域网直连
-  return `http://${hostname}:3001`;
+  const lanUrl = `http://${hostname}:3001`;
+  console.log(`[上传] getBackendBaseUrl → 局域网直连: ${lanUrl}`);
+  return lanUrl;
 }
 
 function getBackendUploadUrl(): string {
@@ -107,18 +115,24 @@ function responseSummary(text: string): string {
 
 async function isBackendAvailable(): Promise<boolean> {
   const url = getBackendHealthUrl();
+  const startTime = Date.now();
+  console.log(`[上传] 开始健康检查 → ${url}（超时 8 秒）`);
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       method: "GET",
       signal: controller.signal,
+      cache: 'no-store',
     });
     clearTimeout(timeout);
-    console.log(`[上传] 健康检查 ${url} → ${res.ok ? '可用' : '不可用'}(${res.status})`);
+    const elapsed = Date.now() - startTime;
+    console.log(`[上传] 健康检查 ${url} → ${res.ok ? '可用' : '不可用'} (status=${res.status}, 耗时=${elapsed}ms)`);
     return res.ok;
   } catch (err) {
-    console.log(`[上传] 健康检查 ${url} → 不可达`, err);
+    const elapsed = Date.now() - startTime;
+    const isAbort = err instanceof DOMException && err.name === 'AbortError';
+    console.warn(`[上传] 健康检查 ${url} → ${isAbort ? '超时' : '不可达'} (耗时=${elapsed}ms)`, err);
     return false;
   }
 }
@@ -233,17 +247,25 @@ export async function uploadToAliyun(blob: Blob, fileName: string): Promise<Uplo
   let backendError: unknown;
   let browserError: unknown;
 
+  console.log(`[上传] === 开始上传 === 文件: ${fileName}, 大小: ${(blob.size / 1024).toFixed(1)}KB`);
+  console.log(`[上传] 当前页面: ${typeof window !== 'undefined' ? window.location.href : '(SSR)'}`);
+
   // 优先：后端代理（Cookie 内置在后端，最稳定）
   const backendAvailable = await isBackendAvailable();
   if (backendAvailable) {
+    console.log('[上传] 选择路径: uploadViaBackend (Cloudflare Tunnel 代理)');
     try {
       return await uploadViaBackend(blob, fileName);
     } catch (err) {
+      console.warn('[上传] 后端代理路径失败，将回退到浏览器直连', err);
       backendError = err;
     }
   } else {
+    console.warn('[上传] 后端不可达，将回退到浏览器直连（softSuccess 路径）');
     backendError = new Error(`本地后端服务（${getBackendBaseUrl()}）未启动`);
   }
+
+  console.log('[上传] 选择路径: uploadViaBrowserDirect (浏览器直连阿里图库)');
 
   // 回退：浏览器直连（需内网 + 登录态）
   try {
