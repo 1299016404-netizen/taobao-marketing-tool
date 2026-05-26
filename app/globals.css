@@ -198,20 +198,4 @@ select:focus-visible,
   text-rendering: geometricPrecision;
 }
 
-/* Sonner Toast 定位：屏幕垂直居中（替代默认顶部），左右各留白 50px，整条居中横展 */
-[data-sonner-toaster][data-y-position="top"] {
-  top: 50% !important;
-  bottom: auto !important;
-  left: 50px !important;
-  right: 50px !important;
-  width: auto !important;
-  max-width: none !important;
-  transform: translateY(-50%) !important;
-}
-
-[data-sonner-toaster][data-y-position="top"] [data-sonner-toast] {
-  width: 100% !important;
-  max-width: 100% !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
+/* Sonner Toaster 已移除。上传结果由业务 UI 直接展示，不再需要 toast 样式覆盖。 */

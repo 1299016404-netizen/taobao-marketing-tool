@@ -367,20 +367,8 @@ export function ControlPanel({
 
         <div className="grid gap-3">
 
-          <Button
-            type="button"
-            size="lg"
-            className="h-[52px] shadow-none hover:shadow-none"
-            onClick={onUpload}
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-            {uploading ? "上传中..." : "上传阿里图库"}
-          </Button>
-
           {uploadResult?.phase === "success" && uploadResult.url ? (
-            <div className="mt-1 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
-              
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -399,7 +387,7 @@ export function ControlPanel({
             </div>
           ) : null}
           {uploadResult?.phase === "success" && !uploadResult.url && uploadResult.softSuccess ? (
-            <div className="mt-1 space-y-2">
+            <div className="space-y-2">
               <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
                 <p className="text-xs font-medium text-emerald-800 mb-1">已上传至阿里图片库</p>
                 <p className="text-xs text-emerald-700 leading-relaxed">
@@ -417,6 +405,18 @@ export function ControlPanel({
               </a>
             </div>
           ) : null}
+
+          <Button
+            type="button"
+            size="lg"
+            className="h-[52px] shadow-none hover:shadow-none"
+            onClick={onUpload}
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
+            {uploading ? "上传中..." : "上传到阿里图片库"}
+          </Button>
+
           {uploadResult?.phase === "error" && uploadResult.error ? (
             <div className="mt-3 space-y-2">
               <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3">
