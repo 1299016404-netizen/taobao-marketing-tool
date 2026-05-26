@@ -1,4 +1,6 @@
-@import "./generated-fonts.css";
+/* generated-fonts.css 不再从主 CSS @import，避免阻塞首屏。
+   改为 layout.tsx 中用 <link rel="stylesheet" media="print" onload> 异步加载，
+   GitHub Pages 限速场景下页面立即可见，10MB 中文字体后台慎加载。 */
 
 @tailwind base;
 @tailwind components;
