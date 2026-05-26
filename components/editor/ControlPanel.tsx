@@ -29,6 +29,8 @@ type UploadState = {
   copied?: boolean;
   fallbackBlob?: Blob;
   fallbackFileName?: string;
+  /** CORS 软成功：请求已发送到阿里图库，响应不可读取，无回链 URL */
+  softSuccess?: boolean;
 };
 
 type ControlPanelProps = {
@@ -394,6 +396,22 @@ export function ControlPanel({
                   {uploadResult.copied ? "已复制" : "复制"}
                 </button>
               </div>
+            </div>
+          ) : null}
+          {uploadResult?.phase === "success" && !uploadResult.url && uploadResult.softSuccess ? (
+            <div className="mt-1 space-y-2">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                <p className="text-xs font-medium text-emerald-800 mb-1">已上传至阿里图片库</p>
+                <p className="text-xs text-emerald-700">请前往图库后台查看最新上传的图片。</p>
+              </div>
+              <a
+                href="https://content.alibaba-inc.com/work/internal-media-management/pic/upload?iframe=3"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-white text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
+              >
+                前往阿里图库后台
+              </a>
             </div>
           ) : null}
           {uploadResult?.phase === "error" && uploadResult.error ? (

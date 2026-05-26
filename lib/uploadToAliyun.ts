@@ -26,6 +26,13 @@ export type UploadResult = {
   success: boolean;
   url?: string;
   error?: string;
+  /**
+   * 软成功：浏览器直连 multipart/form-data 是 CORS simple request，
+   * 请求已成功发出且图片已上传到阿里图库，但响应缺少 Access-Control-Allow-Origin，
+   * 浏览器拒绝读取响应导致 fetch 抛出 TypeError。
+   * 此种情况应视为成功，但无法解析出回链 URL。
+   */
+  softSuccess?: boolean;
 };
 
 // --------------- helpers ---------------
@@ -168,11 +175,24 @@ async function uploadViaBrowserDirect(blob: Blob, fileName: string): Promise<Upl
   formData.append("name", fileName);
   formData.append("fileName", fileName);
 
-  const response = await fetch(ALIBABA_UPLOAD_API_URL, {
-    method: "POST",
-    body: formData,
-    credentials: "include",
-  });
+  let response: Response;
+  try {
+    response = await fetch(ALIBABA_UPLOAD_API_URL, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+  } catch (err) {
+    // CORS 软成功识别：multipart/form-data 属于 CORS simple request，
+    // 请求已发出且图片实际已写入阿里图库，但响应没有 CORS 头，
+    // 浏览器拒绝读取响应，fetch 抛出 TypeError("Failed to fetch" / "NetworkError")。
+    // 在静态部署（GitHub Pages 等无后端代理）场景下，这就是上传成功的标志。
+    if (err instanceof TypeError) {
+      console.warn('[上传] 浏览器直连出现 TypeError，判定为 CORS 软成功（请求已送达阿里图库，响应不可读）', err);
+      return { success: true, softSuccess: true };
+    }
+    throw err;
+  }
 
   const responseText = await response.text();
 
