@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer-when-downgrade">
+  <title>翻页动画工具</title>
+  <style>
+    :root {
+      --front-image: url("assets/front-demo.png");
+      --back-image: url("assets/back-demo.png");
+      --book-rotation: 0deg;
+      --page-ratio: 822 / 348;
+      --page-radius: clamp(30px, 8.5vw, 76px);
+      --ink: #111722;
+      --muted: #65717d;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-strong: rgba(255, 255, 255, 0.96);
+      --line: rgba(35, 43, 56, 0.14);
+      --accent: #0d96b7;
+      --accent-strong: #08708d;
+      --danger: #a43d48;
+      --ok: #0d735d;
+      --ease-flip: cubic-bezier(.16, .86, .24, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Avenir Next", "PingFang SC", "Microsoft YaHei", "Heiti SC", sans-serif;
+      background:
+        linear-gradient(118deg, rgba(255, 255, 255, 0.92) 0%, rgba(232, 244, 247, 0.72) 42%, rgba(247, 231, 234, 0.76) 100%),
+        radial-gradient(circle at 14% 18%, rgba(13, 150, 183, 0.18), transparent 31%),
+        radial-gradient(circle at 88% 70%, rgba(202, 48, 94, 0.14), transparent 34%),
+        #eef3f1;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(22, 34, 46, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(22, 34, 46, 0.03) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.66), transparent 84%);
+    }
+
+    .app-shell {
+      position: relative;
+      display: grid;
+      min-height: 100vh;
+      padding: clamp(86px, 13vh, 128px) 22px clamp(48px, 8vh, 82px);
+      place-items: center;
+    }
+
+    .toolbar {
+      position: fixed;
+      z-index: 20;
+      top: max(18px, env(safe-area-inset-top));
+      right: max(18px, env(safe-area-inset-right));
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      box-shadow: 0 16px 42px rgba(35, 48, 64, 0.12);
+      backdrop-filter: blur(18px) saturate(1.08);
+      -webkit-backdrop-filter: blur(18px) saturate(1.08);
+    }
+
+    .tool-button {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      min-height: 42px;
+      padding: 0 18px;
+      color: var(--ink);
+      font: 750 14px/1 "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+      background: var(--surface-strong);
+      cursor: pointer;
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, color 180ms ease, opacity 180ms ease;
+      white-space: nowrap;
+    }
+
+    .effect-switch {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid rgba(35, 43, 56, 0.1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.52);
+    }
+
+    .effect-option {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      min-height: 34px;
+      padding: 0 13px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font: 750 13px/1 "Avenir Next", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+      white-space: nowrap;
+      transition: color 180ms ease, background 180ms ease, transform 180ms ease;
+    }
+
+    .effect-option:hover {
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .effect-option.is-active {
+      color: #fff;
+      background: linear-gradient(135deg, #1d879d, #0b6680);
+      box-shadow: 0 8px 18px rgba(13, 150, 183, 0.16);
+    }
+
+    .tool-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(13, 150, 183, 0.42);
+      background: #fff;
+    }
+
+    .tool-button:active {
+      transform: translateY(1px);
+    }
+
+    .tool-button:disabled {
+      cursor: progress;
+      opacity: 0.68;
+      transform: none;
+    }
+
+    .effect-option:focus-visible,
+    .tool-button:focus-visible,
+    .book:focus-visible {
+      outline: 2px solid rgba(13, 150, 183, 0.46);
+      outline-offset: 3px;
+    }
+
+    .upload-button {
+      border-color: rgba(13, 150, 183, 0.34);
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 12px 24px rgba(13, 150, 183, 0.22);
+    }
+
+    .upload-button:hover {
+      color: #fff;
+      background: linear-gradient(135deg, #11a8cc, #08708d);
+    }
+
+    .file-input {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .stage {
+      display: grid;
+      width: min(822px, calc(100vw - 32px));
+      gap: 22px;
+      justify-items: center;
+    }
+
+    .book-container {
+      position: relative;
+      width: min(822px, calc(100vw - 32px));
+      aspect-ratio: var(--page-ratio);
+      perspective: 1600px;
+      perspective-origin: 70% 68%;
+    }
+
+    .book {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      transform-style: preserve-3d;
+      transform: translateZ(0);
+      will-change: transform;
+    }
+
+    .book.effect-3d {
+      transform-origin: center center;
+      transform: rotateY(var(--book-rotation));
+      transition: transform 1120ms cubic-bezier(.18, .84, .26, 1);
+    }
+
+    .book.effect-corner {
+      transform: translateZ(0);
+    }
+
+    .page {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      border-radius: var(--page-radius);
+      background-color: transparent;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+      transform-style: preserve-3d;
+      transition: opacity 160ms ease, transform 620ms var(--ease-flip);
+    }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background:
+        linear-gradient(108deg, rgba(255, 255, 255, 0.2), transparent 28%, rgba(255, 255, 255, 0.26) 52%, transparent 76%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 56%, rgba(14, 25, 37, 0.04));
+      mix-blend-mode: soft-light;
+      opacity: 0.68;
+    }
+
+    .page.front {
+      z-index: 2;
+      opacity: 1;
+      background-image: var(--front-image);
+      transform: translateZ(2px) rotateY(0deg);
+    }
+
+    .page.back {
+      z-index: 1;
+      opacity: 0;
+      background-image: var(--back-image);
+      transform: translateZ(1px) rotateY(0deg);
+    }
+
+    .book.effect-corner.is-flipped .page.front {
+      opacity: 0;
+      transform: translateZ(0) rotateY(-14deg);
+    }
+
+    .book.effect-corner.is-flipped .page.back {
+      opacity: 1;
+      transform: translateZ(2px) rotateY(0deg);
+    }
+
+    .book.effect-3d .page {
+      opacity: 1;
+      transition: none;
+    }
+
+    .book.effect-3d .page.front {
+      z-index: 2;
+      transform: rotateY(0deg) translateZ(1px);
+    }
+
+    .book.effect-3d .page.back {
+      z-index: 1;
+      transform: rotateY(180deg) translateZ(1px);
+    }
+
+    .flip-canvas {
+      position: absolute;
+      z-index: 4;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: var(--page-radius);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateZ(12px) rotateY(0deg);
+      transform-style: preserve-3d;
+    }
+
+    .flip-canvas.is-active {
+      opacity: 1;
+    }
+
+    .status-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      max-width: min(822px, calc(100vw - 32px));
+      padding: 10px 18px;
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.7);
+      box-shadow: 0 14px 38px rgba(35, 48, 64, 0.09);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 200ms ease, transform 200ms ease, color 200ms ease, border-color 200ms ease;
+    }
+
+    .status-panel.is-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .status-panel.is-success {
+      color: var(--ok);
+      border-color: rgba(13, 115, 93, 0.18);
+    }
+
+    .status-panel.is-error {
+      color: var(--danger);
+      border-color: rgba(164, 61, 72, 0.22);
+    }
+
+    .status-panel.is-working {
+      color: #0b6d85;
+      border-color: rgba(11, 109, 133, 0.2);
+    }
+
+    @media (max-width: 640px) {
+      .app-shell {
+        padding-top: 104px;
+      }
+
+      .toolbar {
+        left: 14px;
+        right: 14px;
+        justify-content: flex-end;
+        overflow-x: auto;
+        border-radius: 26px;
+      }
+
+      .tool-button {
+        min-height: 40px;
+        padding: 0 14px;
+        font-size: 13px;
+      }
+
+      .stage {
+        gap: 18px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .page,
+      .tool-button,
+      .status-panel,
+      .flip-canvas {
+        transition-duration: 1ms;
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <div class="toolbar" aria-label="工具栏">
+      <div class="effect-switch" role="group" aria-label="翻页效果">
+        <button class="effect-option" type="button" data-effect="3d" aria-pressed="false">3D翻页</button>
+        <button class="effect-option is-active" type="button" data-effect="corner" aria-pressed="true">Canvas翻页</button>
+      </div>
+      <button class="tool-button" id="flipButton" type="button">翻页</button>
+      <button class="tool-button upload-button" id="uploadButton" type="button">上传两张图片</button>
+      <input class="file-input" id="fileInput" type="file" accept="image/*" multiple>
+    </div>
+
+    <section class="stage" aria-label="翻页预览">
+      <div class="book-container">
+        <div class="book effect-corner" id="book" role="button" tabindex="0" aria-label="点击翻页" aria-pressed="false">
+          <div class="page back" aria-label="内页"></div>
+          <div class="page front" aria-label="封面"></div>
+          <canvas class="flip-canvas" id="flipCanvas" width="822" height="348" aria-hidden="true"></canvas>
+        </div>
+      </div>
+      <div class="status-panel" id="statusPanel" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const UPLOAD_ENDPOINT = "https://content.alibaba-inc.com/work/internal-media-management/pic/upload?iframe=3";
+      const CARD_WIDTH = 822;
+      const CARD_HEIGHT = 348;
+      const APNG_FPS = 30;
+      const APNG_DURATION_MS = 1700;
+      const APNG_FRAME_COUNT = Math.round(APNG_FPS * APNG_DURATION_MS / 1000);
+      const ANIMATION_MS = APNG_DURATION_MS;
+      const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
+      const TURN_KEYFRAMES = [
+        { p: 0, top: 1.12, c1: 1.1, c2: 1.02, bottom: 1.03, depth: 0.02, bow: 0 },
+        { p: 0.12, top: 1.06, c1: 1.02, c2: 0.9, bottom: 0.83, depth: 0.08, bow: 0.07 },
+        { p: 0.24, top: 0.92, c1: 0.9, c2: 0.69, bottom: 0.58, depth: 0.18, bow: 0.18 },
+        { p: 0.36, top: 0.55, c1: 0.63, c2: 0.58, bottom: 0.54, depth: 0.26, bow: 0.23 },
+        { p: 0.5, top: 0.43, c1: 0.36, c2: 0.31, bottom: 0.37, depth: 0.3, bow: 0.16 },
+        { p: 0.64, top: 0.23, c1: 0.2, c2: 0.17, bottom: 0.14, depth: 0.24, bow: 0.09 },
+        { p: 0.82, top: 0.03, c1: 0.05, c2: 0.03, bottom: -0.05, depth: 0.12, bow: 0.04 },
+        { p: 1, top: -0.26, c1: -0.22, c2: -0.18, bottom: -0.22, depth: 0.02, bow: 0 }
+      ];
+
+      const root = document.documentElement;
+      const book = document.getElementById("book");
+      const flipButton = document.getElementById("flipButton");
+      const uploadButton = document.getElementById("uploadButton");
+      const fileInput = document.getElementById("fileInput");
+      const statusPanel = document.getElementById("statusPanel");
+      const flipCanvas = document.getElementById("flipCanvas");
+      const flipContext = flipCanvas.getContext("2d", { alpha: true });
+      const effectButtons = Array.from(document.querySelectorAll("[data-effect]"));
+
+      let currentFrontUrl = "assets/front-demo.png";
+      let currentBackUrl = "assets/back-demo.png";
+      let frontObjectUrl = "";
+      let backObjectUrl = "";
+      let effectMode = "corner";
+      let statusTimer = 0;
+      let isFlipped = false;
+      let isAnimating = false;
+      let animationToken = 0;
+      let threeDRotation = 0;
+
+      function easeInOut(value) {
+        return value < 0.5
+          ? 4 * value * value * value
+          : 1 - Math.pow(-2 * value + 2, 3) / 2;
+      }
+
+      function escapeCssUrl(value) {
+        return String(value).replace(/["\\\n\r\f]/g, "\\$&");
+      }
+
+      function setBackgroundImages(frontUrl, backUrl = frontUrl) {
+        currentFrontUrl = frontUrl;
+        currentBackUrl = backUrl;
+        root.style.setProperty("--front-image", `url("${escapeCssUrl(frontUrl)}")`);
+        root.style.setProperty("--back-image", `url("${escapeCssUrl(backUrl)}")`);
+      }
+
+      function normalizeResourceUrl(rawUrl) {
+        const value = String(rawUrl || "").trim();
+        if (!value) {
+          return "";
+        }
+
+        if (value.startsWith("//")) {
+          return `https:${value}`;
+        }
+
+        try {
+          const url = new URL(value, window.location.href);
+          if (window.location.protocol === "https:" && url.protocol === "http:") {
+            url.protocol = "https:";
+          }
+          return url.href;
+        } catch {
+          return value;
+        }
+      }
+
+      function buildToolLink(imageUrl) {
+        const url = new URL(window.location.href);
+        url.hash = "";
+        url.search = "";
+        url.searchParams.set("img", imageUrl);
+        return url.href;
+      }
+
+      function setStatus(message, type = "working", autoHide = false) {
+        window.clearTimeout(statusTimer);
+        statusPanel.textContent = message;
+        statusPanel.className = `status-panel is-visible is-${type}`;
+
+        if (autoHide) {
+          statusTimer = window.setTimeout(() => {
+            statusPanel.className = "status-panel";
+            statusPanel.textContent = "";
+          }, 4200);
+        }
+      }
+
+      function setFlipState(flipped) {
+        isFlipped = flipped;
+        book.classList.toggle("is-flipped", isFlipped);
+        book.setAttribute("aria-pressed", String(isFlipped));
+        flipButton.textContent = isFlipped ? "复位" : "翻页";
+      }
+
+      function setThreeDRotation(rotation) {
+        threeDRotation = rotation;
+        root.style.setProperty("--book-rotation", `${threeDRotation}deg`);
+      }
+
+      function delay(ms) {
+        return new Promise((resolve) => {
+          window.setTimeout(resolve, ms);
+        });
+      }
+
+      function setEffectMode(mode) {
+        animationToken += 1;
+        isAnimating = false;
+        effectMode = mode;
+        book.classList.remove("effect-3d", "effect-corner", "is-flipped", "is-rendering");
+        setThreeDRotation(0);
+        book.classList.add(`effect-${effectMode}`);
+        flipCanvas.classList.remove("is-active");
+        flipContext.clearRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+        setFlipState(false);
+
+        effectButtons.forEach((button) => {
+          const isActive = button.dataset.effect === effectMode;
+          button.classList.toggle("is-active", isActive);
+          button.setAttribute("aria-pressed", String(isActive));
+        });
+      }
+
+      function loadImage(source) {
+        return new Promise((resolve, reject) => {
+          const image = new Image();
+          if (/^https?:/i.test(source)) {
+            image.crossOrigin = "anonymous";
+          }
+          image.onload = () => resolve(image);
+          image.onerror = () => reject(new Error("图片加载失败"));
+          image.src = source;
+        });
+      }
+
+      function createRoundedRectPath(context, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        context.beginPath();
+        context.moveTo(r, 0);
+        context.lineTo(width - r, 0);
+        context.quadraticCurveTo(width, 0, width, r);
+        context.lineTo(width, height - r);
+        context.quadraticCurveTo(width, height, width - r, height);
+        context.lineTo(r, height);
+        context.quadraticCurveTo(0, height, 0, height - r);
+        context.lineTo(0, r);
+        context.quadraticCurveTo(0, 0, r, 0);
+        context.closePath();
+      }
+
+      function drawCoverImage(context, image, width, height) {
+        const imageRatio = image.width / image.height;
+        const targetRatio = width / height;
+        let drawWidth = width;
+        let drawHeight = height;
+        let drawX = 0;
+        let drawY = 0;
+
+        if (imageRatio > targetRatio) {
+          drawWidth = height * imageRatio;
+          drawX = (width - drawWidth) / 2;
+        } else {
+          drawHeight = width / imageRatio;
+          drawY = (height - drawHeight) / 2;
+        }
+
+        context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+      }
+
+      function traceRevealPath(context, t, width, height) {
+        const clamped = Math.max(0, Math.min(2, t));
+        context.beginPath();
+
+        if (clamped >= 1) {
+          context.moveTo(width, (clamped - 1) * height);
+          context.lineTo(width, height);
+          context.lineTo((clamped - 1) * width, height);
+        } else {
+          context.moveTo(clamped * width, 0);
+          context.lineTo(width, 0);
+          context.lineTo(width, height);
+          context.lineTo(0, height);
+          context.lineTo(0, clamped * height);
+        }
+
+        context.closePath();
+      }
+
+      function traceCurveRevealPath(context, fold, width, height) {
+        context.beginPath();
+        context.moveTo(fold.top.x, fold.top.y);
+        context.bezierCurveTo(
+          fold.c1.x,
+          fold.c1.y,
+          fold.c2.x,
+          fold.c2.y,
+          fold.bottom.x,
+          fold.bottom.y
+        );
+        context.lineTo(width, height);
+        context.lineTo(width, 0);
+        context.closePath();
+      }
+
+      function traceCurlSheetPath(context, fold, width, height, depth) {
+        const topBack = {
+          x: fold.top.x + depth * 0.54,
+          y: Math.max(0, fold.top.y - depth * 0.2)
+        };
+        const bottomBack = {
+          x: fold.bottom.x + depth * 0.34,
+          y: Math.min(height, fold.bottom.y + depth * 0.18)
+        };
+
+        context.beginPath();
+        context.moveTo(fold.top.x, fold.top.y);
+        context.bezierCurveTo(
+          fold.c1.x,
+          fold.c1.y,
+          fold.c2.x,
+          fold.c2.y,
+          fold.bottom.x,
+          fold.bottom.y
+        );
+        context.bezierCurveTo(
+          fold.bottom.x + depth * 0.55,
+          height - depth * 0.12,
+          bottomBack.x,
+          height * 0.72,
+          bottomBack.x,
+          bottomBack.y
+        );
+        context.bezierCurveTo(
+          fold.c2.x + depth * 0.84,
+          height * 0.48,
+          fold.c1.x + depth * 0.72,
+          height * 0.16,
+          topBack.x,
+          topBack.y
+        );
+        context.closePath();
+      }
+
+      function interpolateKeyframes(progress) {
+        const p = Math.max(0, Math.min(1, progress));
+        let left = TURN_KEYFRAMES[0];
+        let right = TURN_KEYFRAMES[TURN_KEYFRAMES.length - 1];
+
+        for (let index = 0; index < TURN_KEYFRAMES.length - 1; index += 1) {
+          if (p >= TURN_KEYFRAMES[index].p && p <= TURN_KEYFRAMES[index + 1].p) {
+            left = TURN_KEYFRAMES[index];
+            right = TURN_KEYFRAMES[index + 1];
+            break;
+          }
+        }
+
+        const span = Math.max(0.0001, right.p - left.p);
+        const raw = (p - left.p) / span;
+        const local = raw * raw * (3 - 2 * raw);
+        const value = (name) => left[name] + (right[name] - left[name]) * local;
+
+        return {
+          top: value("top"),
+          c1: value("c1"),
+          c2: value("c2"),
+          bottom: value("bottom"),
+          depth: value("depth"),
+          bow: value("bow")
+        };
+      }
+
+      function getCurlFold(progress, width, height) {
+        const k = interpolateKeyframes(progress);
+        const bow = k.bow * width;
+
+        return {
+          top: { x: k.top * width, y: -height * 0.06 },
+          c1: { x: k.c1 * width + bow, y: height * 0.2 },
+          c2: { x: k.c2 * width - bow, y: height * 0.74 },
+          bottom: { x: k.bottom * width, y: height * 1.04 },
+          depth: k.depth * width
+        };
+      }
+
+      function getFoldLine(t, width, height) {
+        const clamped = Math.max(0.002, Math.min(1.998, t));
+
+        if (clamped >= 1) {
+          return {
+            a: { x: width, y: (clamped - 1) * height },
+            b: { x: (clamped - 1) * width, y: height }
+          };
+        }
+
+        return {
+          a: { x: clamped * width, y: 0 },
+          b: { x: 0, y: clamped * height }
+        };
+      }
+
+      function reflectAcrossLine(context, a, b) {
+        const angle = Math.atan2(b.y - a.y, b.x - a.x);
+        context.translate(a.x, a.y);
+        context.rotate(angle);
+        context.scale(1, -1);
+        context.rotate(-angle);
+        context.translate(-a.x, -a.y);
+      }
+
+      function traceFoldBand(context, a, b, normal, width) {
+        context.beginPath();
+        context.moveTo(a.x, a.y);
+        context.lineTo(b.x, b.y);
+        context.lineTo(b.x + normal.x * width, b.y + normal.y * width);
+        context.lineTo(a.x + normal.x * width, a.y + normal.y * width);
+        context.closePath();
+      }
+
+      function drawCornerFlipFrame(context, progress, fromImage, toImage) {
+        const width = CARD_WIDTH;
+        const height = CARD_HEIGHT;
+        const radius = Math.min(76, width * 0.092);
+        const eased = Math.max(0, Math.min(1, progress));
+        const fold = getCurlFold(eased, width, height);
+        const curlOpacity = Math.min(1, Math.sin(Math.PI * eased) * 1.25);
+
+        context.clearRect(0, 0, width, height);
+        context.save();
+        createRoundedRectPath(context, width, height, radius);
+        context.clip();
+
+        if (eased >= 0.995) {
+          drawCoverImage(context, toImage, width, height);
+          context.restore();
+          return;
+        }
+
+        drawCoverImage(context, fromImage, width, height);
+
+        if (eased > 0.01) {
+          context.save();
+          traceCurveRevealPath(context, fold, width, height);
+          context.clip();
+          drawCoverImage(context, toImage, width, height);
+
+          const underShade = context.createLinearGradient(fold.bottom.x, height, width, 0);
+          underShade.addColorStop(0, `rgba(12, 20, 30, ${0.18 * curlOpacity})`);
+          underShade.addColorStop(0.35, "rgba(255, 255, 255, 0)");
+          underShade.addColorStop(1, `rgba(0, 0, 0, ${0.05 * curlOpacity})`);
+          context.fillStyle = underShade;
+          context.fillRect(0, 0, width, height);
+          context.restore();
+        }
+
+        if (eased > 0.015 && eased < 0.985) {
+          context.save();
+          traceCurlSheetPath(context, fold, width, height, fold.depth);
+          context.clip();
+
+          const curlShade = context.createLinearGradient(fold.top.x, 0, fold.top.x + fold.depth, height);
+          curlShade.addColorStop(0, `rgba(242, 243, 243, ${0.98 * curlOpacity})`);
+          curlShade.addColorStop(0.28, `rgba(255, 255, 255, ${0.96 * curlOpacity})`);
+          curlShade.addColorStop(0.58, `rgba(220, 223, 222, ${0.78 * curlOpacity})`);
+          curlShade.addColorStop(1, `rgba(136, 145, 145, ${0.26 * curlOpacity})`);
+          context.fillStyle = curlShade;
+          context.fillRect(0, 0, width, height);
+
+          context.save();
+          context.globalAlpha = 0.08 * curlOpacity;
+          context.translate(fold.top.x + fold.depth * 0.65, 0);
+          context.scale(-0.28, 1);
+          context.translate(-fold.top.x, 0);
+          drawCoverImage(context, fromImage, width, height);
+          context.restore();
+
+          context.restore();
+
+          context.save();
+          context.globalAlpha = 0.52 * curlOpacity;
+          context.strokeStyle = "rgba(128, 138, 139, 0.42)";
+          context.lineWidth = 5;
+          context.beginPath();
+          context.moveTo(fold.top.x, fold.top.y);
+          context.bezierCurveTo(
+            fold.c1.x,
+            fold.c1.y,
+            fold.c2.x,
+            fold.c2.y,
+            fold.bottom.x,
+            fold.bottom.y
+          );
+          context.stroke();
+
+          context.globalAlpha = 0.68 * curlOpacity;
+          context.strokeStyle = "rgba(255, 255, 255, 0.68)";
+          context.lineWidth = 2;
+          context.beginPath();
+          context.moveTo(fold.top.x + 12, fold.top.y);
+          context.bezierCurveTo(
+            fold.c1.x + 10,
+            fold.c1.y,
+            fold.c2.x + 8,
+            fold.c2.y,
+            fold.bottom.x + 10,
+            fold.bottom.y
+          );
+          context.stroke();
+          context.restore();
+        }
+
+        const surface = context.createLinearGradient(0, 0, width, height);
+        surface.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+        surface.addColorStop(0.48, "rgba(255, 255, 255, 0)");
+        surface.addColorStop(1, "rgba(17, 24, 34, 0.035)");
+        context.fillStyle = surface;
+        context.fillRect(0, 0, width, height);
+
+        context.restore();
+      }
+
+      function drawThreeDFlipFrame(context, progress, fromImage, toImage) {
+        const width = CARD_WIDTH;
+        const height = CARD_HEIGHT;
+        const radius = Math.min(76, width * 0.092);
+        const eased = Math.max(0, Math.min(1, progress));
+        const surfaceImage = eased < 0.5 ? fromImage : toImage;
+        const scaleX = Math.max(0.018, Math.abs(Math.cos(Math.PI * eased)));
+        const light = Math.sin(Math.PI * eased);
+
+        context.clearRect(0, 0, width, height);
+        context.save();
+        context.translate(width / 2, height / 2);
+        context.scale(scaleX, 1);
+        context.translate(-width / 2, -height / 2);
+        createRoundedRectPath(context, width, height, radius);
+        context.clip();
+        drawCoverImage(context, surfaceImage, width, height);
+
+        const shade = context.createLinearGradient(0, 0, width, 0);
+        shade.addColorStop(0, `rgba(255, 255, 255, ${0.12 + light * 0.18})`);
+        shade.addColorStop(0.48, `rgba(255, 255, 255, ${0.04 + light * 0.16})`);
+        shade.addColorStop(1, `rgba(12, 18, 28, ${0.05 + light * 0.28})`);
+        context.fillStyle = shade;
+        context.fillRect(0, 0, width, height);
+        context.restore();
+
+        context.save();
+        context.globalAlpha = 0.32 * light;
+        context.fillStyle = "rgba(18, 26, 38, 0.22)";
+        context.fillRect(width / 2 - 1, 0, 2, height);
+        context.restore();
+      }
+
+      async function animateCornerFlip(targetState = !isFlipped) {
+        const fromUrl = isFlipped ? currentBackUrl : currentFrontUrl;
+        const toUrl = targetState ? currentBackUrl : currentFrontUrl;
+
+        const [fromImage, toImage] = await Promise.all([
+          loadImage(fromUrl),
+          loadImage(toUrl)
+        ]);
+        const start = performance.now();
+        drawCornerFlipFrame(flipContext, 0, fromImage, toImage);
+        flipCanvas.classList.add("is-active");
+        setFlipState(targetState);
+        book.classList.add("is-rendering");
+
+        await new Promise((resolve) => {
+          function step(now) {
+            const raw = Math.min(1, (now - start) / ANIMATION_MS);
+            drawCornerFlipFrame(flipContext, easeInOut(raw), fromImage, toImage);
+
+            if (raw < 1) {
+              requestAnimationFrame(step);
+            } else {
+              resolve();
+            }
+          }
+
+          requestAnimationFrame(step);
+        });
+      }
+
+      async function runFlip(targetState = !isFlipped) {
+        if (isAnimating || targetState === isFlipped) {
+          return;
+        }
+
+        isAnimating = true;
+        const token = animationToken + 1;
+        animationToken = token;
+
+        try {
+          if (effectMode === "corner") {
+            await animateCornerFlip(targetState);
+          } else {
+            setThreeDRotation(threeDRotation - 180);
+            setFlipState(targetState);
+            await delay(ANIMATION_MS);
+          }
+        } catch {
+          if (token === animationToken) {
+            setFlipState(targetState);
+          }
+        } finally {
+          if (token === animationToken) {
+            setFlipState(targetState);
+            flipCanvas.classList.remove("is-active");
+            book.classList.remove("is-rendering");
+            flipContext.clearRect(0, 0, CARD_WIDTH, CARD_HEIGHT);
+            isAnimating = false;
+          }
+        }
+      }
+
+      async function handleFlipCommand() {
+        if (effectMode === "corner" && isFlipped) {
+          setFlipState(false);
+          return;
+        }
+
+        await runFlip(!isFlipped);
+      }
+
+      function canvasToPngBytes(canvas) {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              reject(new Error("PNG 帧生成失败"));
+              return;
+            }
+
+            resolve(new Uint8Array(await blob.arrayBuffer()));
+          }, "image/png");
+        });
+      }
+
+      function readUint32(bytes, offset) {
+        return (
+          (bytes[offset] << 24) |
+          (bytes[offset + 1] << 16) |
+          (bytes[offset + 2] << 8) |
+          bytes[offset + 3]
+        ) >>> 0;
+      }
+
+      function parsePngFrame(bytes) {
+        for (let i = 0; i < PNG_SIGNATURE.length; i += 1) {
+          if (bytes[i] !== PNG_SIGNATURE[i]) {
+            throw new Error("PNG 帧格式无效");
+          }
+        }
+
+        let offset = PNG_SIGNATURE.length;
+        let ihdr = null;
+        const idat = [];
+
+        while (offset < bytes.length) {
+          const length = readUint32(bytes, offset);
+          const typeOffset = offset + 4;
+          const dataOffset = offset + 8;
+          const type = String.fromCharCode(
+            bytes[typeOffset],
+            bytes[typeOffset + 1],
+            bytes[typeOffset + 2],
+            bytes[typeOffset + 3]
+          );
+          const data = bytes.slice(dataOffset, dataOffset + length);
+
+          if (type === "IHDR") {
+            ihdr = data;
+          } else if (type === "IDAT") {
+            idat.push(data);
+          } else if (type === "IEND") {
+            break;
+          }
+
+          offset = dataOffset + length + 4;
+        }
+
+        if (!ihdr || !idat.length) {
+          throw new Error("PNG 帧缺少图像数据");
+        }
+
+        return { ihdr, idat: concatBytes(idat) };
+      }
+
+      function makeCrcTable() {
+        const table = new Uint32Array(256);
+        for (let n = 0; n < 256; n += 1) {
+          let c = n;
+          for (let k = 0; k < 8; k += 1) {
+            c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+          }
+          table[n] = c >>> 0;
+        }
+        return table;
+      }
+
+      const crcTable = makeCrcTable();
+
+      function crc32(bytes) {
+        let crc = 0xffffffff;
+        for (let i = 0; i < bytes.length; i += 1) {
+          crc = crcTable[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+      }
+
+      function writeUint32(bytes, offset, value) {
+        bytes[offset] = (value >>> 24) & 0xff;
+        bytes[offset + 1] = (value >>> 16) & 0xff;
+        bytes[offset + 2] = (value >>> 8) & 0xff;
+        bytes[offset + 3] = value & 0xff;
+      }
+
+      function writeUint16(bytes, offset, value) {
+        bytes[offset] = (value >>> 8) & 0xff;
+        bytes[offset + 1] = value & 0xff;
+      }
+
+      function concatBytes(chunks) {
+        const total = chunks.reduce((size, chunk) => size + chunk.length, 0);
+        const merged = new Uint8Array(total);
+        let offset = 0;
+
+        chunks.forEach((chunk) => {
+          merged.set(chunk, offset);
+          offset += chunk.length;
+        });
+
+        return merged;
+      }
+
+      function makeChunk(type, data = new Uint8Array(0)) {
+        const output = new Uint8Array(12 + data.length);
+        writeUint32(output, 0, data.length);
+        output[4] = type.charCodeAt(0);
+        output[5] = type.charCodeAt(1);
+        output[6] = type.charCodeAt(2);
+        output[7] = type.charCodeAt(3);
+        output.set(data, 8);
+        writeUint32(output, 8 + data.length, crc32(output.slice(4, 8 + data.length)));
+        return output;
+      }
+
+      function makeActl(frameCount) {
+        const data = new Uint8Array(8);
+        writeUint32(data, 0, frameCount);
+        writeUint32(data, 4, 0);
+        return makeChunk("acTL", data);
+      }
+
+      function makeFctl(sequence, width, height) {
+        const data = new Uint8Array(26);
+        writeUint32(data, 0, sequence);
+        writeUint32(data, 4, width);
+        writeUint32(data, 8, height);
+        writeUint32(data, 12, 0);
+        writeUint32(data, 16, 0);
+        writeUint16(data, 20, 1);
+        writeUint16(data, 22, APNG_FPS);
+        data[24] = 0;
+        data[25] = 0;
+        return makeChunk("fcTL", data);
+      }
+
+      function makeFdat(sequence, idatData) {
+        const data = new Uint8Array(4 + idatData.length);
+        writeUint32(data, 0, sequence);
+        data.set(idatData, 4);
+        return makeChunk("fdAT", data);
+      }
+
+      async function createApngFile(fromSource, toSource, mode = effectMode) {
+        const [fromImage, toImage] = await Promise.all([
+          loadImage(fromSource),
+          loadImage(toSource)
+        ]);
+        const renderCanvas = document.createElement("canvas");
+        const renderContext = renderCanvas.getContext("2d", { alpha: true });
+        renderCanvas.width = CARD_WIDTH;
+        renderCanvas.height = CARD_HEIGHT;
+
+        const frames = [];
+        for (let index = 0; index < APNG_FRAME_COUNT; index += 1) {
+          const progress = easeInOut(index / (APNG_FRAME_COUNT - 1));
+          if (mode === "corner") {
+            drawCornerFlipFrame(renderContext, progress, fromImage, toImage);
+          } else {
+            drawThreeDFlipFrame(renderContext, progress, fromImage, toImage);
+          }
+          frames.push(parsePngFrame(await canvasToPngBytes(renderCanvas)));
+        }
+
+        const chunks = [new Uint8Array(PNG_SIGNATURE), makeChunk("IHDR", frames[0].ihdr), makeActl(frames.length)];
+        let sequence = 0;
+
+        frames.forEach((frame, index) => {
+          chunks.push(makeFctl(sequence, CARD_WIDTH, CARD_HEIGHT));
+          sequence += 1;
+
+          if (index === 0) {
+            chunks.push(makeChunk("IDAT", frame.idat));
+          } else {
+            chunks.push(makeFdat(sequence, frame.idat));
+            sequence += 1;
+          }
+        });
+
+        chunks.push(makeChunk("IEND"));
+        const bytes = concatBytes(chunks);
+        const blob = new Blob([bytes], { type: "image/png" });
+        return new File([blob], `flip-${Date.now()}.apng`, { type: "image/png" });
+      }
+
+      async function uploadApng(file) {
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        const response = await fetch(UPLOAD_ENDPOINT, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+          mode: "cors"
+        });
+
+        if (!response.ok) {
+          throw new Error(`上传接口返回 ${response.status}`);
+        }
+
+        const payload = await response.json();
+        const uploadedUrl = normalizeResourceUrl(payload && payload.data && payload.data.url);
+
+        if (!uploadedUrl) {
+          throw new Error("上传成功但响应中没有 data.url");
+        }
+
+        return uploadedUrl;
+      }
+
+      async function handleFiles(fileList) {
+        const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+
+        if (files.length < 2) {
+          setStatus("请一次选择两张图片：第一张封面，第二张内页", "error");
+          return;
+        }
+
+        if (frontObjectUrl) {
+          URL.revokeObjectURL(frontObjectUrl);
+        }
+
+        if (backObjectUrl) {
+          URL.revokeObjectURL(backObjectUrl);
+        }
+
+        const [frontFile, backFile] = files;
+        frontObjectUrl = URL.createObjectURL(frontFile);
+        backObjectUrl = URL.createObjectURL(backFile);
+        setBackgroundImages(frontObjectUrl, backObjectUrl);
+        setFlipState(false);
+        setStatus(`已载入两张图片，正在生成 ${effectMode === "corner" ? "掀角" : "3D"} 30fps APNG`, "working");
+        uploadButton.disabled = true;
+
+        try {
+          const apngFile = await createApngFile(frontObjectUrl, backObjectUrl, effectMode);
+          setStatus(`APNG 已生成，正在上传 ${Math.max(1, Math.round(apngFile.size / 1024))}KB`, "working");
+          const uploadedUrl = await uploadApng(apngFile);
+          const toolLink = buildToolLink(uploadedUrl);
+          setStatus("上传成功，已打开分享链接", "success", true);
+          window.open(toolLink, "_blank", "noopener,noreferrer");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "未知错误";
+          setStatus(`上传失败：${message}`, "error");
+        } finally {
+          uploadButton.disabled = false;
+          fileInput.value = "";
+        }
+      }
+
+      function loadFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const sharedImage = normalizeResourceUrl(params.get("img"));
+        const frontImage = normalizeResourceUrl(params.get("front"));
+        const backImage = normalizeResourceUrl(params.get("back"));
+
+        if (frontImage || backImage) {
+          setBackgroundImages(frontImage || backImage, backImage || frontImage);
+          setStatus("已加载链接图片", "success", true);
+          return true;
+        }
+
+        if (sharedImage) {
+          setBackgroundImages(sharedImage);
+          setStatus("已加载链接图片", "success", true);
+          return true;
+        }
+
+        return false;
+      }
+
+      uploadButton.addEventListener("click", () => fileInput.click());
+
+      fileInput.addEventListener("change", () => {
+        handleFiles(fileInput.files);
+      });
+
+      effectButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          setEffectMode(button.dataset.effect);
+        });
+      });
+
+      flipButton.addEventListener("click", handleFlipCommand);
+      book.addEventListener("click", handleFlipCommand);
+
+      book.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleFlipCommand();
+        }
+      });
+
+      loadFromQuery();
+      setEffectMode(effectMode);
+    })();
+  </script>
+</body>
+</html>

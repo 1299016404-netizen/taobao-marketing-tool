@@ -1,0 +1,12 @@
+.next
+node_modules
+dist
+*.log
+logs/
+.vercel-tmp/
+.next/
+# out/ is the static export consumed by GitHub Pages, keep it tracked
+.env*
+.DS_Store
+!.env.example
+.vercel

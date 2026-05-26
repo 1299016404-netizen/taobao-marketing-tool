@@ -1,0 +1,197 @@
+@import "./generated-fonts.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-interface:
+    "Google Sans Text", "Google Sans", "SF Pro Text", "SF Pro Display", -apple-system,
+    BlinkMacSystemFont, "PingFang SC", "PingFangSCMedium", sans-serif;
+  --font-zaozi: var(--font-interface);
+  --stitch-canvas: #f2f3f5;
+  --stitch-panel: #f8f5f2;
+  --stitch-panel-soft: #ffffff;
+  --stitch-panel-strong: #e8e8e5;
+  --stitch-ink: #171920;
+  --stitch-muted: #3a3d45;
+  --stitch-subtle: #8a8d94;
+  --stitch-line: rgba(20, 22, 28, 0.12);
+  --stitch-line-strong: rgba(20, 22, 28, 0.2);
+  --stitch-accent: #b91942;
+  --stitch-accent-strong: #b91942;
+  --stitch-accent-soft: rgba(185, 25, 66, 0.1);
+  --background: 220 13% 95%;
+  --foreground: 228 13% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 228 13% 12%;
+  --primary: 343 76% 41%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 30 24% 96%;
+  --secondary-foreground: 228 13% 12%;
+  --muted: 220 6% 91%;
+  --muted-foreground: 222 7% 42%;
+  --accent: 343 76% 41%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 228 13% 12% / 0.12;
+  --input: 228 13% 12% / 0.14;
+  --ring: 343 76% 41%;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  color-scheme: light;
+  background: var(--stitch-canvas);
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  overflow-x: hidden;
+  color: var(--stitch-ink);
+  font-family: var(--font-interface);
+  letter-spacing: 0;
+  background:
+    radial-gradient(circle at 18px 18px, rgba(20, 22, 28, 0.08) 1px, transparent 1.4px),
+    linear-gradient(180deg, #f2f3f5 0%, #f7f6f4 56%, #f8f5f2 100%);
+  background-size:
+    16px 16px,
+    100% 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid rgba(185, 25, 66, 0.22);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: #171920;
+  background: rgba(185, 25, 66, 0.18);
+}
+
+.glass-panel {
+  border: 1px solid var(--stitch-line);
+  background: rgba(248, 245, 242, 0.92);
+  box-shadow:
+    0 18px 50px rgba(20, 22, 28, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.glass-panel button,
+.glass-panel button[aria-pressed="true"],
+.glass-panel button:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.glass-panel > div > div:first-child > label:first-child {
+  display: none !important;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.panel-line {
+  border-color: var(--stitch-line);
+}
+
+.checkerboard,
+.checkerboard-dark {
+  background-color: var(--stitch-canvas);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(25, 27, 34, 0.16) 1px, transparent 1.5px);
+  background-position:
+    -12px 0;
+  background-size: 16px 16px;
+}
+
+.checkerboard-dark {
+  background-color: #f7f6f4;
+}
+
+.export-stage {
+  contain: layout paint style;
+  will-change: transform;
+}
+
+.preview-frame-wrap {
+  filter: drop-shadow(0 28px 54px rgba(20, 22, 28, 0.12));
+}
+
+.timeline-range {
+  width: 100%;
+  height: 22px;
+  appearance: none;
+  cursor: pointer;
+  background: transparent;
+}
+
+.timeline-range::-webkit-slider-runnable-track {
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(25, 27, 34, 0.12);
+}
+
+.timeline-range::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -5px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--stitch-accent-strong);
+  box-shadow: none;
+}
+
+.timeline-range::-moz-range-track {
+  height: 8px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(25, 27, 34, 0.12);
+}
+
+.timeline-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--stitch-accent-strong);
+  box-shadow: none;
+}
+
+.smart-text,
+.smart-text * {
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
