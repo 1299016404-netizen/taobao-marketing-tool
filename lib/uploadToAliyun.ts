@@ -5,13 +5,19 @@ export const ALIYUN_IMAGE_LIBRARY_URL =
 
 // --------------- dynamic backend URL ---------------
 
+// Cloudflare Tunnel：用于将 GitHub Pages（HTTPS）流量代理到本机后端 http://127.0.0.1:3001，
+// 绕过浏览器 Mixed Content 拦截。tunnel 由 launchd 守护进程保持常驻，URL 重启会变。
+const CLOUDFLARED_TUNNEL_BASE = 'https://ana-remained-peninsula-officially.trycloudflare.com';
+
 function getBackendBaseUrl(): string {
   if (typeof window === 'undefined') return 'http://127.0.0.1:3001';
-  const hostname = window.location.hostname;
-  const host = (hostname === 'localhost' || hostname === '127.0.0.1')
-    ? '127.0.0.1'
-    : hostname;
-  return `http://${host}:3001`;
+  const { hostname, protocol } = window.location;
+  // 本地开发
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return 'http://127.0.0.1:3001';
+  // HTTPS 页面（GitHub Pages 等）→ 走 Cloudflare Tunnel，避免 Mixed Content
+  if (protocol === 'https:') return CLOUDFLARED_TUNNEL_BASE;
+  // HTTP 局域网直连
+  return `http://${hostname}:3001`;
 }
 
 function getBackendUploadUrl(): string {
