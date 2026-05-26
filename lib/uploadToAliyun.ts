@@ -113,28 +113,37 @@ function responseSummary(text: string): string {
 
 // --------------- health check ---------------
 
+// 健康检查：12 秒宽松超时 + 单次重试（应对 Cloudflare Tunnel 冷启动 / 偶发抖动）
 async function isBackendAvailable(): Promise<boolean> {
   const url = getBackendHealthUrl();
-  const startTime = Date.now();
-  console.log(`[上传] 开始健康检查 → ${url}（超时 8 秒）`);
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(url, {
-      method: "GET",
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    clearTimeout(timeout);
-    const elapsed = Date.now() - startTime;
-    console.log(`[上传] 健康检查 ${url} → ${res.ok ? '可用' : '不可用'} (status=${res.status}, 耗时=${elapsed}ms)`);
-    return res.ok;
-  } catch (err) {
-    const elapsed = Date.now() - startTime;
-    const isAbort = err instanceof DOMException && err.name === 'AbortError';
-    console.warn(`[上传] 健康检查 ${url} → ${isAbort ? '超时' : '不可达'} (耗时=${elapsed}ms)`, err);
-    return false;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const startTime = Date.now();
+    console.log(`[上传] 健康检查 ${attempt}/2 → ${url}（超时 12 秒）`);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      const res = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      clearTimeout(timeout);
+      const elapsed = Date.now() - startTime;
+      if (res.ok) {
+        console.log(`[上传] 健康检查通过 (status=${res.status}, 耗时=${elapsed}ms)`);
+        return true;
+      }
+      console.warn(`[上传] 健康检查返回 ${res.status} (耗时=${elapsed}ms)`);
+    } catch (err) {
+      const elapsed = Date.now() - startTime;
+      const isAbort = err instanceof DOMException && err.name === 'AbortError';
+      console.warn(`[上传] 健康检查 ${isAbort ? '超时' : '不可达'} (耗时=${elapsed}ms)`, err);
+    }
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 800));
+    }
   }
+  return false;
 }
 
 // --------------- upload via backend proxy ---------------
@@ -243,62 +252,53 @@ async function uploadViaBrowserDirect(blob: Blob, fileName: string): Promise<Upl
 
 // --------------- main entry ---------------
 
+// 唯一上传策略：backend 代理 + 自动重试 3 次（间隔 1.5s）。
+// 不再降级到浏览器直连——浏览器直连必然落入 CORS softSuccess（拿不到 CDN 链接），
+// 对用户毫无价值；真正失败时给出可执行的诊断信息，比软成功文案更有意义。
 export async function uploadToAliyun(blob: Blob, fileName: string): Promise<UploadResult> {
-  let backendError: unknown;
-  let browserError: unknown;
-
   console.log(`[上传] === 开始上传 === 文件: ${fileName}, 大小: ${(blob.size / 1024).toFixed(1)}KB`);
   console.log(`[上传] 当前页面: ${typeof window !== 'undefined' ? window.location.href : '(SSR)'}`);
 
-  // 优先：后端代理（Cookie 内置在后端，最稳定）
+  // 1) 健康检查（带宽松超时 + 单次重试）
   const backendAvailable = await isBackendAvailable();
-  if (backendAvailable) {
-    console.log('[上传] 选择路径: uploadViaBackend (Cloudflare Tunnel 代理)');
+  if (!backendAvailable) {
+    return {
+      success: false,
+      error: `本地后端服务（${getBackendBaseUrl()}）当前不可达。\n\n请确认：\n1) backend 是否在运行（launchctl list | grep apng-upload）\n2) Cloudflare Tunnel 是否在运行（launchctl list | grep cloudflared）\n3) 网络是否可访问 tunnel 域名`,
+    };
+  }
+
+  // 2) backend 代理上传：最多 3 次尝试（每次 15s 超时，间隔 1.5s）
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    console.log(`[上传] backend 上传尝试 ${attempt}/3`);
     try {
-      return await uploadViaBackend(blob, fileName);
+      const result = await uploadViaBackend(blob, fileName);
+      if (result.success && result.url) {
+        console.log(`[上传] ✅ 第 ${attempt} 次尝试成功`);
+        return result;
+      }
+      // success=false 直接抛错走重试，不要返回 success=true url="" 死态
+      throw new Error(result.error || 'backend 返回成功但缺少 CDN 链接');
     } catch (err) {
-      console.warn('[上传] 后端代理路径失败，将回退到浏览器直连', err);
-      backendError = err;
-    }
-  } else {
-    console.warn('[上传] 后端不可达，将回退到浏览器直连（softSuccess 路径）');
-    backendError = new Error(`本地后端服务（${getBackendBaseUrl()}）未启动`);
-  }
-
-  console.log('[上传] 选择路径: uploadViaBrowserDirect (浏览器直连阿里图库)');
-
-  // 回退：浏览器直连（需内网 + 登录态）
-  try {
-    return await uploadViaBrowserDirect(blob, fileName);
-  } catch (err) {
-    browserError = err;
-  }
-
-  // 全部失败 → 分层错误提示
-  const messages: string[] = [];
-
-  if (backendError) {
-    const msg =
-      backendError instanceof Error ? backendError.message : "本地后端服务请求失败";
-    messages.push(`【后端代理】${msg}\n修复方式：启动后端服务 cd backend && python3 server.py`);
-  }
-
-  if (browserError) {
-    const isNetworkErr =
-      browserError instanceof TypeError && /fetch/i.test(browserError.message);
-    if (isNetworkErr) {
-      messages.push(
-        "【浏览器直连】无法访问阿里内网接口（tps.alibaba-inc.com）。请确认：1) 已连接内网/VPN；2) 已在浏览器中登录阿里内容后台。",
-      );
-    } else {
-      const msg =
-        browserError instanceof Error ? browserError.message : "浏览器直连上传失败";
-      messages.push(`【浏览器直连】${msg}`);
+      lastError = err;
+      console.warn(`[上传] 第 ${attempt} 次失败:`, err);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500));
+      }
     }
   }
 
+  // 3) 三次都失败：返回明确错误，不再 softSuccess
+  const errMsg = lastError instanceof Error ? lastError.message : String(lastError);
   return {
     success: false,
-    error: `上传失败，所有方式均不可用：\n\n${messages.join("\n\n")}`,
+    error: `上传失败（重试 3 次均失败）：${errMsg}\n\n如持续失败，请刷新页面（⌘+⇧+R）重试，或联系开发者排查 backend 日志。`,
   };
+}
+
+// 保留：浏览器直连函数仅供内网静态部署场景调试使用，主链路不再调用
+// （删除会破坏 import 引用，但实际运行已不会进入此分支）
+export async function _uploadViaBrowserDirectForDebug(blob: Blob, fileName: string): Promise<UploadResult> {
+  return uploadViaBrowserDirect(blob, fileName);
 }
