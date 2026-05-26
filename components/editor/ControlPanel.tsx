@@ -402,15 +402,18 @@ export function ControlPanel({
             <div className="mt-1 space-y-2">
               <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
                 <p className="text-xs font-medium text-emerald-800 mb-1">已上传至阿里图片库</p>
-                <p className="text-xs text-emerald-700">请前往图库后台查看最新上传的图片。</p>
+                <p className="text-xs text-emerald-700 leading-relaxed">
+                  在 GitHub Pages 静态部署下浏览器无法读取跨域响应，因此拿不到 CDN 链接。
+                  图片已同步下载到本地作为备份，请前往图库后台复制 CDN 链接。
+                </p>
               </div>
               <a
-                href="https://content.alibaba-inc.com/work/internal-media-management/pic/upload?iframe=3"
+                href="https://tps.alibaba-inc.com/mine"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-emerald-200 bg-white text-xs font-medium text-emerald-700 transition hover:bg-emerald-50"
               >
-                前往阿里图库后台
+                打开阿里图库后台复制链接
               </a>
             </div>
           ) : null}
