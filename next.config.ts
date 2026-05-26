@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   basePath: isProd ? repoBasePath : "",
   assetPrefix: isProd ? `${repoBasePath}/` : "",
+  env: {
+    NEXT_PUBLIC_BASE_PATH: isProd ? repoBasePath : "",
+  },
   async headers() {
     return [
       {

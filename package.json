@@ -5,8 +5,8 @@
   "scripts": {
     "predev": "node scripts/generate-font-css.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/generate-font-css.mjs",
-    "build": "next build",
+    "prebuild": "NEXT_PUBLIC_BASE_PATH=/taobao-marketing-tool node scripts/generate-font-css.mjs",
+    "build": "NEXT_PUBLIC_BASE_PATH=/taobao-marketing-tool next build",
     "start": "next start",
     "lint": "eslint app components lib templates next.config.ts tailwind.config.ts --ext .ts,.tsx"
   },

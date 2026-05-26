@@ -52,8 +52,9 @@ async function getFFmpeg() {
       import("@ffmpeg/util"),
     ]);
     const ffmpeg = new FFmpeg();
-    const coreURL = await toBlobURL("/ffmpeg/ffmpeg-core.js", "text/javascript");
-    const wasmURL = await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm");
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+    const coreURL = await toBlobURL(`${basePath}/ffmpeg/ffmpeg-core.js`, "text/javascript");
+    const wasmURL = await toBlobURL(`${basePath}/ffmpeg/ffmpeg-core.wasm`, "application/wasm");
     await ffmpeg.load({ coreURL, wasmURL });
     return ffmpeg;
   })().catch((error) => {
@@ -114,7 +115,7 @@ async function encodeWithGifJs(
     workers: 2,
     quality,
     transparent: null,
-    workerScript: "/gif.worker.js",
+    workerScript: `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/gif.worker.js`,
   });
 
   canvases.forEach((canvas, index) => {

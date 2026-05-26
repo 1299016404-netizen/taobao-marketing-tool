@@ -9,6 +9,8 @@ import { uploadToAliyun, ALIYUN_IMAGE_LIBRARY_URL } from "@/lib/uploadToAliyun";
 import type { PixelRatio, TemplateConfig, TemplateId } from "@/lib/types";
 import { DEFAULT_WAIST_BACKGROUND } from "@/lib/waistBackgrounds";
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 type UploadState = {
   phase: "idle" | "uploading" | "success" | "error";
   url?: string;
@@ -45,7 +47,7 @@ export function MarketingEditor() {
     "mini-app": {
       text: "文案内容极限是十二字",
       backgroundColor: "#FFE5E5",
-      miniIconDataUrl: "/images/mini-app-marketing-icon.png",
+      miniIconDataUrl: `${BASE_PATH}/images/mini-app-marketing-icon.png`,
       waistBackgroundDataUrl: null,
       waistLetterSpacing: 0.09,
       pixelRatio: 3,

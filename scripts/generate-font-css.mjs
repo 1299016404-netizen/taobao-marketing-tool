@@ -3,6 +3,7 @@ import { extname, basename, join } from "node:path";
 
 const fontsDir = join(process.cwd(), "public", "fonts");
 const outputFile = join(process.cwd(), "app", "generated-fonts.css");
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const fontExtensions = new Set([".ttf", ".otf", ".woff", ".woff2"]);
 const ignoredFontFiles = new Set(["ZaoZiGongFangYuanHeiTi-2.ttf"]);
 
@@ -72,7 +73,7 @@ for (const file of fontFiles) {
       [
         "@font-face {",
         `  font-family: "${cssString(alias.family)}";`,
-        `  src: url("/fonts/${cssString(file)}") format("truetype");`,
+        `  src: url("${basePath}/fonts/${cssString(file)}") format("truetype");`,
         `  font-weight: ${alias.weight};`,
         "  font-style: normal;",
         "  font-display: swap;",

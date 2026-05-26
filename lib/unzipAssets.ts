@@ -1,7 +1,9 @@
 import JSZip from "jszip";
 import type { LottieJSON } from "@/lib/types";
 
-export const DEFAULT_ZIP_PATH = "/assets/闪购微动画.zip";
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
+export const DEFAULT_ZIP_PATH = `${BASE_PATH}/assets/闪购微动画.zip`;
 
 export type UnzippedLottiePackage = {
   zipPath: string;

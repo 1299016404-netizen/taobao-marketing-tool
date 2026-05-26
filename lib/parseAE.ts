@@ -1,5 +1,7 @@
 import type { AEProbe } from "@/lib/types";
 
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 const IMAGE_RE = /[^"'\n\r\t{}<>|]+?\.(?:png|jpe?g|webp|psd|ai)/gi;
 const EFFECT_RE = /ADBE\s+[A-Za-z0-9 _-]+/g;
 
@@ -41,7 +43,7 @@ function countMatches(text: string, pattern: string) {
   return text.split(pattern).length - 1;
 }
 
-export async function probeAEFile(sourcePath = "/assets/抽免单.aep"): Promise<AEProbe> {
+export async function probeAEFile(sourcePath = `${BASE_PATH}/assets/抽免单.aep`): Promise<AEProbe> {
   const response = await fetch(sourcePath, { cache: "no-store" });
 
   if (!response.ok) {
