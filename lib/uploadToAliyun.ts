@@ -10,7 +10,7 @@ export const ALIYUN_IMAGE_LIBRARY_URL =
 // 2. tunnel URL 在 cloudflared 重启时由脚本自动更新到 gh-pages
 // 3. 前端代码永远不需要手动改 URL
 
-const TUNNEL_FALLBACK = 'https://trinity-knowledge-succeed-significant.trycloudflare.com';
+const TUNNEL_FALLBACK = 'https://yellow-toxic-barn-providers.trycloudflare.com';
 let _tunnelUrlCache: string | null = null;
 let _tunnelUrlPromise: Promise<string> | null = null;
 
