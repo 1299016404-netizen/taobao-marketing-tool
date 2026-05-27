@@ -19,8 +19,9 @@ const chineseFontFamily: Record<ChineseFont, string> = {
   fliggy: "FliggyFontMedium, FliggyFont, sans-serif",
 };
 
+// 数字 + 拉丁字母统一使用 Fliggy Sans 102 Medium（按用户要求：腰封/淘搜/淘旅行/小程序卡片所有数字字体）
 const latinFontFamily =
-  "'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif";
+  "FliggySans102Medium, 'Fliggy Sans 102', 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif";
 
 export function SmartTextRenderer({
   text,
