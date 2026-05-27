@@ -25,7 +25,7 @@ type UploadState = {
 export function MarketingEditor() {
   const exportRef = React.useRef<HTMLDivElement | null>(null);
   const [activeTemplate, setActiveTemplate] =
-    React.useState<TemplateId>("tao-main-search");
+    React.useState<TemplateId>("waist-banner");
   const [uploadState, setUploadState] = React.useState<UploadState>({
     phase: "idle",
   });
