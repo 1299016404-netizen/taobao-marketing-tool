@@ -5,35 +5,55 @@ export const ALIYUN_IMAGE_LIBRARY_URL =
 
 // --------------- dynamic backend URL ---------------
 
-// Cloudflare Tunnel：用于将 GitHub Pages（HTTPS）流量代理到本机后端 http://127.0.0.1:3001，
-// 绕过浏览器 Mixed Content 拦截。tunnel 由 launchd 守护进程保持常驻，URL 重启会变。
-const CLOUDFLARED_TUNNEL_BASE = 'https://trinity-knowledge-succeed-significant.trycloudflare.com';
+// Cloudflare Tunnel URL 运行时动态获取：
+// 1. HTTPS 页面（GitHub Pages）→ 从同域 tunnel.json 拉取当前有效 tunnel URL
+// 2. tunnel URL 在 cloudflared 重启时由脚本自动更新到 gh-pages
+// 3. 前端代码永远不需要手动改 URL
 
-function getBackendBaseUrl(): string {
+const TUNNEL_FALLBACK = 'https://trinity-knowledge-succeed-significant.trycloudflare.com';
+let _tunnelUrlCache: string | null = null;
+let _tunnelUrlPromise: Promise<string> | null = null;
+
+async function getTunnelUrl(): Promise<string> {
+  if (_tunnelUrlCache) return _tunnelUrlCache;
+  if (_tunnelUrlPromise) return _tunnelUrlPromise;
+  const basePath = typeof window !== 'undefined'
+    ? (window.location.pathname.replace(/\/[^/]*$/, '') || '')
+    : '';
+  _tunnelUrlPromise = fetch(`${basePath}/tunnel.json?_=${Date.now()}`)
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then((d: { url?: string }) => {
+      const url = d.url?.replace(/\/$/, '') || TUNNEL_FALLBACK;
+      _tunnelUrlCache = url;
+      console.log(`[上传] tunnel.json → ${url}`);
+      return url;
+    })
+    .catch(err => {
+      console.warn('[上传] tunnel.json 读取失败，使用 fallback:', err);
+      _tunnelUrlCache = TUNNEL_FALLBACK;
+      return TUNNEL_FALLBACK;
+    });
+  return _tunnelUrlPromise;
+}
+
+async function getBackendBaseUrl(): Promise<string> {
   if (typeof window === 'undefined') return 'http://127.0.0.1:3001';
   const { hostname, protocol } = window.location;
-  // 本地开发
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    console.log('[上传] getBackendBaseUrl → 本地开发，使用 http://127.0.0.1:3001');
     return 'http://127.0.0.1:3001';
   }
-  // HTTPS 页面（GitHub Pages 等）→ 走 Cloudflare Tunnel，避免 Mixed Content
   if (protocol === 'https:') {
-    console.log(`[上传] getBackendBaseUrl → HTTPS 页面，使用 Cloudflare Tunnel: ${CLOUDFLARED_TUNNEL_BASE}`);
-    return CLOUDFLARED_TUNNEL_BASE;
+    return await getTunnelUrl();
   }
-  // HTTP 局域网直连
-  const lanUrl = `http://${hostname}:3001`;
-  console.log(`[上传] getBackendBaseUrl → 局域网直连: ${lanUrl}`);
-  return lanUrl;
+  return `http://${hostname}:3001`;
 }
 
-function getBackendUploadUrl(): string {
-  return `${getBackendBaseUrl()}/api/upload`;
+async function getBackendUploadUrl(): Promise<string> {
+  return `${await getBackendBaseUrl()}/api/upload`;
 }
 
-function getBackendHealthUrl(): string {
-  return `${getBackendBaseUrl()}/api/health`;
+async function getBackendHealthUrl(): Promise<string> {
+  return `${await getBackendBaseUrl()}/api/health`;
 }
 
 export type UploadResult = {
@@ -115,7 +135,7 @@ function responseSummary(text: string): string {
 
 // 健康检查：12 秒宽松超时 + 单次重试（应对 Cloudflare Tunnel 冷启动 / 偶发抖动）
 async function isBackendAvailable(): Promise<boolean> {
-  const url = getBackendHealthUrl();
+  const url = await getBackendHealthUrl();
   for (let attempt = 1; attempt <= 2; attempt++) {
     const startTime = Date.now();
     console.log(`[上传] 健康检查 ${attempt}/2 → ${url}（超时 12 秒）`);
@@ -149,7 +169,7 @@ async function isBackendAvailable(): Promise<boolean> {
 // --------------- upload via backend proxy ---------------
 
 async function uploadViaBackend(blob: Blob, fileName: string): Promise<UploadResult> {
-  const url = getBackendUploadUrl();
+  const url = await getBackendUploadUrl();
   const file = new File([blob], fileName, { type: blob.type || "image/png" });
   const formData = new FormData();
   formData.append("file", file);
@@ -264,7 +284,7 @@ export async function uploadToAliyun(blob: Blob, fileName: string): Promise<Uplo
   if (!backendAvailable) {
     return {
       success: false,
-      error: `本地后端服务（${getBackendBaseUrl()}）当前不可达。\n\n请确认：\n1) backend 是否在运行（launchctl list | grep apng-upload）\n2) Cloudflare Tunnel 是否在运行（launchctl list | grep cloudflared）\n3) 网络是否可访问 tunnel 域名`,
+      error: `本地后端服务（${await getBackendBaseUrl()}）当前不可达。\n\n请确认：\n1) backend 是否在运行（launchctl list | grep apng-upload）\n2) Cloudflare Tunnel 是否在运行（launchctl list | grep cloudflared）\n3) 网络是否可访问 tunnel 域名`,
     };
   }
 
