@@ -7,7 +7,7 @@ export const ALIYUN_IMAGE_LIBRARY_URL =
 
 // Cloudflare Tunnel：用于将 GitHub Pages（HTTPS）流量代理到本机后端 http://127.0.0.1:3001，
 // 绕过浏览器 Mixed Content 拦截。tunnel 由 launchd 守护进程保持常驻，URL 重启会变。
-const CLOUDFLARED_TUNNEL_BASE = 'https://ana-remained-peninsula-officially.trycloudflare.com';
+const CLOUDFLARED_TUNNEL_BASE = 'https://trinity-knowledge-succeed-significant.trycloudflare.com';
 
 function getBackendBaseUrl(): string {
   if (typeof window === 'undefined') return 'http://127.0.0.1:3001';
