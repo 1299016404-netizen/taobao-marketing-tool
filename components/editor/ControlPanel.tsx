@@ -14,6 +14,7 @@ import { Dropzone } from "@/components/upload/Dropzone";
 import type { PixelRatio, TemplateConfig, TemplateId } from "@/lib/types";
 import { TEMPLATE_META } from "@/lib/types";
 import {
+  AUTO_FILLED_WAIST_TEXTS,
   DEFAULT_WAIST_BACKGROUND,
   VIP_88_BACKGROUND,
   VIP_88_LEFT_WHEAT,
@@ -205,20 +206,24 @@ export function ControlPanel({
                         type="button"
                         aria-pressed={selected}
                         onClick={() => {
-                          const shouldUseVipText =
-                            isVip88 &&
+                          // 安全覆盖规则：仅当当前文案处于“自动文案集”（初始默认 + 各腰封默认文案）
+                          // 才以新腰封的 defaultText 覆盖，避免冲掉用户手动输入。
+                          const canOverrideText =
                             !selected &&
-                            (config.text === "" || config.text === "春节提前订特惠");
-                          const nextText = shouldUseVipText ? "专享特惠" : config.text;
+                            item.defaultText !== undefined &&
+                            AUTO_FILLED_WAIST_TEXTS.has(config.text);
+                          const nextText = canOverrideText
+                            ? item.defaultText!
+                            : config.text;
                           const nextLetterSpacing =
-                            shouldUseVipText &&
+                            canOverrideText &&
                             getWaistLetterSpacingForText(nextText) !== undefined
                               ? getWaistLetterSpacingForText(nextText)
                               : undefined;
 
                           onConfigChange({
                             waistBackgroundDataUrl: item.src,
-                            ...(shouldUseVipText ? { text: nextText } : {}),
+                            ...(canOverrideText ? { text: nextText } : {}),
                             ...(isVip88 && config.vip88AssetsVisible === undefined
                               ? { vip88AssetsVisible: true }
                               : {}),
