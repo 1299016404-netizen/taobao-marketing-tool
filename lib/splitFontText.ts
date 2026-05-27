@@ -1,4 +1,4 @@
-export type FontSegmentKind = "latin" | "text";
+export type FontSegmentKind = "latin" | "number" | "text";
 
 export type FontCharacter = {
   value: string;
@@ -6,10 +6,13 @@ export type FontCharacter = {
   index: number;
 };
 
-const latinOrNumberPattern = /[\p{Script=Latin}\p{Number}]/u;
+const numberPattern = /\p{Number}/u;
+const latinPattern = /\p{Script=Latin}/u;
 
 export function getCharacterKind(value: string): FontSegmentKind {
-  return latinOrNumberPattern.test(value) ? "latin" : "text";
+  if (numberPattern.test(value)) return "number";
+  if (latinPattern.test(value)) return "latin";
+  return "text";
 }
 
 export function splitFontText(text: string): FontCharacter[] {

@@ -36,26 +36,36 @@ export function SmartTextRenderer({
 
   return (
     <span className={cn("smart-text inline-block whitespace-nowrap", className)} style={style}>
-      {characters.map((item, index) => (
-        <span
-          key={`${item.index}-${item.value}`}
-          className={cn("inline-block", charClassName)}
-          style={{
-            fontFamily:
-              item.kind === "latin"
-                ? latinFontFamily
-                : chineseFontFamily[chineseFont],
-            fontSynthesis: "none",
-            fontWeight,
-            marginRight:
-              trackingEm && index < characters.length - 1
-                ? `${trackingEm}em`
-                : undefined,
-          }}
-        >
-          {item.value}
-        </span>
-      ))}
+      {characters.map((item, index) => {
+        const isNumber = item.kind === "number";
+        const prev = characters[index - 1];
+        const next = characters[index + 1];
+        // 数字字符与非数字相邻边界处加 0.04em（letter-spacing 4%）
+        const numberSpaceLeft = isNumber && prev && prev.kind !== "number" ? 0.04 : 0;
+        const numberSpaceRight =
+          isNumber && next && next.kind !== "number" && index < characters.length - 1 ? 0.04 : 0;
+        const trackingMr =
+          trackingEm && index < characters.length - 1 ? trackingEm : 0;
+        const marginRightTotal = trackingMr + numberSpaceRight;
+        const fontFamily =
+          item.kind === "text" ? chineseFontFamily[chineseFont] : latinFontFamily;
+
+        return (
+          <span
+            key={`${item.index}-${item.value}`}
+            className={cn("inline-block", charClassName)}
+            style={{
+              fontFamily,
+              fontSynthesis: "none",
+              fontWeight,
+              marginLeft: numberSpaceLeft > 0 ? `${numberSpaceLeft}em` : undefined,
+              marginRight: marginRightTotal > 0 ? `${marginRightTotal}em` : undefined,
+            }}
+          >
+            {item.value}
+          </span>
+        );
+      })}
     </span>
   );
 }
