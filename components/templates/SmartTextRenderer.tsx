@@ -40,10 +40,9 @@ export function SmartTextRenderer({
         const isNumber = item.kind === "number";
         const prev = characters[index - 1];
         const next = characters[index + 1];
-        // 数字字符与非数字相邻边界处加 0.04em（letter-spacing 4%）
-        const numberSpaceLeft = isNumber && prev && prev.kind !== "number" ? 0.04 : 0;
-        const numberSpaceRight =
-          isNumber && next && next.kind !== "number" && index < characters.length - 1 ? 0.04 : 0;
+        // 数字字符两侧只要不是数字（包括字符串边界）就加 0.04em（letter-spacing 4%）
+        const numberSpaceLeft = isNumber && (!prev || prev.kind !== "number") ? 0.04 : 0;
+        const numberSpaceRight = isNumber && (!next || next.kind !== "number") ? 0.04 : 0;
         const trackingMr =
           trackingEm && index < characters.length - 1 ? trackingEm : 0;
         const marginRightTotal = trackingMr + numberSpaceRight;
