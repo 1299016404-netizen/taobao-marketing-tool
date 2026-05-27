@@ -27,6 +27,14 @@ export type TemplateMeta = {
 
 export const TEMPLATE_META: TemplateMeta[] = [
   {
+    id: "waist-banner",
+    name: "腰封设计",
+    description: "选择背景并控制字间距",
+    shortName: "腰封",
+    figmaNode: "1125:35275",
+    exportSize: "222 × 34",
+  },
+  {
     id: "tao-main-search",
     name: "淘主搜常规标",
     description: "透明底自适应宽度标签",
@@ -49,14 +57,6 @@ export const TEMPLATE_META: TemplateMeta[] = [
     shortName: "轻应用",
     figmaNode: "1125:35272",
     exportSize: "292 × 58",
-  },
-  {
-    id: "waist-banner",
-    name: "腰封设计",
-    description: "选择背景并控制字间距",
-    shortName: "腰封",
-    figmaNode: "1125:35275",
-    exportSize: "222 × 34",
   },
 ];
 
