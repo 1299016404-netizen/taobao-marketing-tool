@@ -10,9 +10,16 @@ export const ALIYUN_IMAGE_LIBRARY_URL =
 // 2. tunnel URL 在 cloudflared 重启时由脚本自动更新到 gh-pages
 // 3. 前端代码永远不需要手动改 URL
 
-const TUNNEL_FALLBACK = 'https://yellow-toxic-barn-providers.trycloudflare.com';
+const TUNNEL_FALLBACK = 'https://regime-nutten-empirical-liberal.trycloudflare.com';
 let _tunnelUrlCache: string | null = null;
 let _tunnelUrlPromise: Promise<string> | null = null;
+
+/** 清除 tunnel URL 缓存，下次调用 getTunnelUrl() 会重新 fetch tunnel.json
+ *  用于在后端不可达时换取 watchdog 刚推出的新 URL */
+export function invalidateTunnelUrlCache() {
+  _tunnelUrlCache = null;
+  _tunnelUrlPromise = null;
+}
 
 async function getTunnelUrl(): Promise<string> {
   if (_tunnelUrlCache) return _tunnelUrlCache;
@@ -20,7 +27,7 @@ async function getTunnelUrl(): Promise<string> {
   const basePath = typeof window !== 'undefined'
     ? (window.location.pathname.replace(/\/[^/]*$/, '') || '')
     : '';
-  _tunnelUrlPromise = fetch(`${basePath}/tunnel.json?_=${Date.now()}`)
+  _tunnelUrlPromise = fetch(`${basePath}/tunnel.json?_=${Date.now()}`, { cache: 'no-store' })
     .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
     .then((d: { url?: string }) => {
       const url = d.url?.replace(/\/$/, '') || TUNNEL_FALLBACK;
@@ -134,8 +141,10 @@ function responseSummary(text: string): string {
 // --------------- health check ---------------
 
 // 健康检查：12 秒宽松超时 + 单次重试（应对 Cloudflare Tunnel 冷启动 / 偶发抖动）
+// 第 1 次失败后，会主动清理 tunnel URL 缓存重 fetch tunnel.json，
+// 以便在 watchdog 推出新 URL 后用户无需刷页即可恢复。
 async function isBackendAvailable(): Promise<boolean> {
-  const url = await getBackendHealthUrl();
+  let url = await getBackendHealthUrl();
   for (let attempt = 1; attempt <= 2; attempt++) {
     const startTime = Date.now();
     console.log(`[上传] 健康检查 ${attempt}/2 → ${url}（超时 12 秒）`);
@@ -160,6 +169,10 @@ async function isBackendAvailable(): Promise<boolean> {
       console.warn(`[上传] 健康检查 ${isAbort ? '超时' : '不可达'} (耗时=${elapsed}ms)`, err);
     }
     if (attempt < 2) {
+      // 第 1 次失败：清 tunnel 缓存 + 重读 tunnel.json（调后全异步 watchdog 可能刚推了新 URL）
+      console.log('[上传] 清除 tunnel URL 缓存并重拉 tunnel.json');
+      invalidateTunnelUrlCache();
+      url = await getBackendHealthUrl();
       await new Promise(r => setTimeout(r, 800));
     }
   }

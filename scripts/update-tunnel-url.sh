@@ -5,6 +5,7 @@
 # ======================================================================
 
 set -euo pipefail
+IFS=$'\n\t'
 
 LOG_FILE="/Users/liaozhansheng/Library/Logs/cloudflared-apng/tunnel-sync.log"
 STDERR_LOG="/Users/liaozhansheng/Library/Logs/cloudflared-apng/stderr.log"
@@ -15,10 +16,11 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 
 # 等待 cloudflared 输出新 URL（最多等 30 秒）
 wait_for_url() {
+  local url=""
   for i in $(seq 1 15); do
-    URL=$(grep -oE "https://[a-z-]+\.trycloudflare\.com" "$STDERR_LOG" 2>/dev/null | tail -1)
-    if [ -n "$URL" ]; then
-      echo "$URL"
+    url=$(grep -oE "https://[a-z-]+\.trycloudflare\.com" "$STDERR_LOG" 2>/dev/null | tail -1 || true)
+    if [ -n "$url" ]; then
+      echo "$url"
       return 0
     fi
     sleep 2
@@ -27,8 +29,13 @@ wait_for_url() {
 }
 
 # 获取当前 tunnel URL
-NEW_URL=$(wait_for_url) || { log "ERROR: 30s 内未检测到 tunnel URL"; exit 1; }
-log "检测到 tunnel URL: $NEW_URL"
+NEW_URL=""
+NEW_URL=$(wait_for_url || true)
+if [ -z "$NEW_URL" ]; then
+  log "ERROR: 30s within no tunnel URL detected"
+  exit 1
+fi
+log "detected tunnel URL: $NEW_URL"
 
 # 读取当前 gh-pages 上的 tunnel.json（如果存在）
 CURRENT_URL=""
@@ -38,27 +45,34 @@ fi
 
 # 如果 URL 没变，跳过
 if [ "$NEW_URL" = "$CURRENT_URL" ]; then
-  log "URL 未变化，跳过同步"
+  log "URL unchanged, skip sync"
   exit 0
 fi
 
-log "URL 变化: $CURRENT_URL → $NEW_URL，开始同步到 gh-pages"
+log "URL change: [$CURRENT_URL] -> [$NEW_URL], start sync to gh-pages"
 
 # 确保 gh-pages worktree 存在
 if [ ! -d "$GH_PAGES_DIR/.git" ]; then
-  log "初始化 gh-pages 目录"
+  log "init gh-pages dir"
   rm -rf "$GH_PAGES_DIR"
   git clone --single-branch --branch gh-pages "$REPO_URL" "$GH_PAGES_DIR" 2>> "$LOG_FILE" || {
-    log "ERROR: clone gh-pages 失败"; exit 1;
+    log "ERROR: clone gh-pages failed"; exit 1;
   }
 fi
 
-# 更新 tunnel.json
+# 更新 tunnel.json（fetch + reset 避免崩脱并发推送冲突）
 cd "$GH_PAGES_DIR"
-git pull origin gh-pages --ff-only 2>> "$LOG_FILE" || true
+git fetch origin gh-pages 2>> "$LOG_FILE" || true
+git reset --hard origin/gh-pages 2>> "$LOG_FILE" || true
 echo "{\"url\":\"$NEW_URL\"}" > tunnel.json
 git add tunnel.json
-git commit -m "auto: update tunnel URL → $NEW_URL" 2>> "$LOG_FILE" || { log "无变化，跳过"; exit 0; }
-git push origin gh-pages 2>> "$LOG_FILE" || { log "ERROR: push 失败"; exit 1; }
+git commit -m "auto: update tunnel URL -> $NEW_URL" 2>> "$LOG_FILE" || { log "no diff, skip"; exit 0; }
+# push 失败时重试一次（fetch + rebase + push）
+if ! git push origin gh-pages 2>> "$LOG_FILE"; then
+  log "push failed, retry with rebase"
+  git fetch origin gh-pages 2>> "$LOG_FILE" || true
+  git rebase origin/gh-pages 2>> "$LOG_FILE" || git rebase --abort 2>> "$LOG_FILE" || true
+  git push origin gh-pages 2>> "$LOG_FILE" || { log "ERROR: push retry failed"; exit 1; }
+fi
 
-log "✅ 同步完成: tunnel.json → $NEW_URL"
+log "OK sync done: tunnel.json -> $NEW_URL"
